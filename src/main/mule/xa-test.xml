@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:bti="http://www.mulesoft.org/schema/mule/ee/bti" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/bti http://www.mulesoft.org/schema/mule/ee/bti/current/mule-bti-ee.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+    <http:listener-config name="xa-test-httpListenerConfig">
+        <http:listener-connection host="0.0.0.0" port="8081" />
+    </http:listener-config>
+    <apikit:config name="xa-test-config" api="resource::929f8513-a2b3-42b8-aafb-73ac9cb0e933:xa-test:1.0.0:raml:zip:xa-test.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+    <db:config name="Database_Config" doc:name="Database Config" doc:id="69a74bf9-f150-4001-a927-fc91a15bf614" >
+		<db:oracle-connection host="localhost" user="SYSTEM" password="password" port='#[payload.host]' useXaTransactions="true"/>
+	</db:config>
+	<bti:transaction-manager doc:name="Bitronix Transaction Manager" doc:id="a9f0e753-9650-49ce-9bee-12c46eb2af7f" />
+	<flow name="xa-test-main">
+        <http:listener config-ref="xa-test-httpListenerConfig" path="/api/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:router config-ref="xa-test-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Bad request"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="xa-test-console">
+        <http:listener config-ref="xa-test-httpListenerConfig" path="/console/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="xa-test-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="post:\xa:application\json:xa-test-config">
+        <logger level="INFO" message="post:\xa:application\json:xa-test-config" />
+		<flow-ref doc:name="Flow Reference" doc:id="62c5a234-1e24-4c18-b71b-7d567c8562d1" name="xa-testSub_Flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="16d295a9-9330-4d63-bfb5-2e6439dc13f7" message="end of evangelion"/>
+    </flow>
+	<sub-flow name="xa-testSub_Flow" doc:id="fbfcf211-0eef-439a-89b0-67b8d7fd8ec4" >
+		<set-variable value="#[[&#10;	&#10;]]" doc:name="Init loopResults" doc:id="eeef379c-c6f0-494f-8cce-b26825a57554" variableName="loopResults"/>
+		<try doc:name="Try" doc:id="647b1500-7837-4cec-b898-9554dec8d79e" transactionalAction="ALWAYS_BEGIN" transactionType="XA">
+			<foreach doc:name="For Each" doc:id="939e57d1-b34a-4c72-aaf3-cc3942d04bf5" collection='#[payload.requestArray]'>
+				<logger level="INFO" doc:name="Payload's RequestArray for Current Counters" doc:id="76f59619-614c-4c69-8213-792b4d2ea51b" message="Current Counter: #[vars.counter] Payload: #[payload]"/>
+				<db:stored-procedure doc:name="Stored procedure" doc:id="4becaff9-1f6d-4782-ad40-77f6a3a02f0e" config-ref="Database_Config">
+					<db:sql ><![CDATA[{
+call STP.XA_TEST(
+        :break,
+        :id,	
+        :name,	
+        :O_STEP,
+        :O_STATUS
+    )
+}]]></db:sql>
+					<db:input-parameters ><![CDATA[#[{
+	break: payload.break,
+	id: payload.id,
+	name: payload.name
+}]]]></db:input-parameters>
+					<db:output-parameters >
+						<db:output-parameter key="O_STATUS" type="NUMERIC" />
+						<db:output-parameter key="O_STEP" type="VARCHAR" />
+					</db:output-parameters>
+				</db:stored-procedure>
+				<logger level="INFO" doc:name="Payload Post Stored Procedure Call" doc:id="fc9c1924-b473-492d-8035-07d00bdd6f78" message="Stored Procedure Outputs: #[payload]"/>
+				<set-variable value="#[vars.loopResults ++ [payload]]" doc:name="Aggregate payload into loopResults" doc:id="9e555523-06dc-4c7b-aa87-dbed2b2408da" variableName="loopResults"/>
+				<validation:is-true doc:name="Is true" doc:id="68ef3eff-bb7a-4f88-9167-06cc8bcbc92b" expression="#[payload.O_STATUS == 0]" message="O_STATUS IS EQUAL TO 0">
+					<error-mapping targetType="ANY" />
+				</validation:is-true>
+			</foreach>
+			<error-handler >
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="c5029775-9f80-4084-9a85-95de9d99c62f" >
+					<ee:transform doc:name="Transform Message" doc:id="99b5b1a6-238e-4f74-a881-93fee87bb660" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+vars.loopResults]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+				</on-error-propagate>
+			</error-handler>
+		</try>
+		<ee:transform doc:name="Transform Message" doc:id="64824233-d211-4c38-9381-66361e59fae4">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+vars.loopResults]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</sub-flow>
+</mule>
